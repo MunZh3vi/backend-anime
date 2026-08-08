@@ -136,7 +136,10 @@ const options: swaggerJsdoc.Options = {
       },
     },
   },
-  apis: [path.join(__dirname, "../routes/*.{ts,js}")],
+  // glob (dependencia de swagger-jsdoc) trata "\" como carácter de escape en
+  // el patrón, así que en Windows path.join() rompe el match silenciosamente
+  // (produce "src\routes\*.{ts,js}"). Se normaliza a barras "/" siempre.
+  apis: [path.join(__dirname, "../routes/*.{ts,js}").split(path.sep).join("/")],
 };
 
 export const swaggerSpec = swaggerJsdoc(options);
