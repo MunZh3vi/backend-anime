@@ -1,0 +1,35 @@
+import dotenv from "dotenv";
+
+dotenv.config();
+
+function num(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function list(value: string | undefined): string[] {
+  return (value ?? "")
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+
+export const env = {
+  nodeEnv: process.env.NODE_ENV ?? "development",
+  port: num(process.env.PORT, 4000),
+  logLevel: process.env.LOG_LEVEL ?? "debug",
+
+  allowedOrigins: list(process.env.ALLOWED_ORIGINS) ?? [],
+
+  httpTimeoutMs: num(process.env.HTTP_TIMEOUT_MS, 10_000),
+
+  cacheTtlCatalog: num(process.env.CACHE_TTL_CATALOG, 3600),
+  cacheTtlEpisode: num(process.env.CACHE_TTL_EPISODE, 600),
+
+  rateLimitWindowMs: num(process.env.RATE_LIMIT_WINDOW_MS, 60_000),
+  rateLimitMax: num(process.env.RATE_LIMIT_MAX, 100),
+
+  imageProxyAllowedHosts: list(process.env.IMAGE_PROXY_ALLOWED_HOSTS),
+} as const;
+
+export const isProd = env.nodeEnv === "production";
