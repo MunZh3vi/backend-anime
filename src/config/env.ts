@@ -35,6 +35,8 @@ export const env = {
   accessTokenExpiresIn: process.env.ACCESS_TOKEN_EXPIRES_IN ?? "15m",
   refreshTokenExpiresInDays: num(process.env.REFRESH_TOKEN_EXPIRES_IN_DAYS, 30),
   bcryptSaltRounds: num(process.env.BCRYPT_SALT_ROUNDS, 12),
+
+  imageProxySecret: resolveSecret("IMAGE_PROXY_SECRET"),
 } as const;
 
 export const isProd = env.nodeEnv === "production";

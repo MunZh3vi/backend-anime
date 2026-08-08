@@ -11,6 +11,7 @@ import * as tioanimeService from "../services/tioanime.service";
 import * as monoschinosService from "../services/monoschinos.service";
 import * as hentailaService from "../services/hentaila.service";
 import { resolveEmbedUrl } from "../utils/resolvers/resolvers";
+import { rewriteImageUrlsDeep } from "../utils/imageProxy";
 
 type CatalogCapable = { getCatalog?: (page?: unknown, genre?: unknown) => Promise<unknown> };
 
@@ -93,13 +94,16 @@ export async function status(_req: Request, res: Response) {
 export async function search(req: Request, res: Response) {
   const { q, domain } = req.query;
   const result = await animeService.searchAnime(q, domain);
-  res.status(200).json(result);
+  res.status(200).json(rewriteImageUrlsDeep(result));
 }
 
 export async function info(req: Request, res: Response) {
   if (!req.query.url) throw ApiError.badRequest("Se requiere el parametro url");
-  const result = await cacheWrap(`anime:info:${req.query.url}`, CACHE_TTL.CATALOG, () =>
-    animeService.getAnimeInfo(req.query.url)
+  // El rewrite de imágenes va DENTRO del factory: cacheManager no clona, así
+  // que si se reescribiera después de leer del caché, en el segundo hit se
+  // re-cifraría un valor que ya es la ruta proxeada (doble envoltura rota).
+  const result = await cacheWrap(`anime:info:${req.query.url}`, CACHE_TTL.CATALOG, async () =>
+    rewriteImageUrlsDeep(await animeService.getAnimeInfo(req.query.url))
   );
   res.status(200).json(result);
 }
@@ -122,17 +126,17 @@ export async function catalog(req: Request, res: Response) {
     service = CATALOG_PROVIDERS.animeav1 as CatalogCapable;
   }
 
-  const result = await cacheWrap(`anime:catalog:${provider}:${req.query.page}:${req.query.genre}`, CACHE_TTL.CATALOG, () =>
-    service!.getCatalog!(req.query.page, req.query.genre)
-  );
-
-  const data = (result as { data?: { results?: Array<Record<string, unknown>> } }).data;
-  if (data && Array.isArray(data.results)) {
-    for (const item of data.results) {
-      if (item.url) item.slug = item.url;
-      item.provider = provider;
+  const result = await cacheWrap(`anime:catalog:${provider}:${req.query.page}:${req.query.genre}`, CACHE_TTL.CATALOG, async () => {
+    const raw = await service!.getCatalog!(req.query.page, req.query.genre);
+    const data = (raw as { data?: { results?: Array<Record<string, unknown>> } }).data;
+    if (data && Array.isArray(data.results)) {
+      for (const item of data.results) {
+        if (item.url) item.slug = item.url;
+        item.provider = provider;
+      }
     }
-  }
+    return rewriteImageUrlsDeep(raw);
+  });
 
   res.status(200).json(result);
 }

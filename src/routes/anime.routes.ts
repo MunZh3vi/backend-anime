@@ -56,12 +56,14 @@ animeRouter.get("/status", asyncHandler(status));
  * /v1/anime/image-proxy:
  *   get:
  *     summary: Proxy de imágenes (sin autenticación, evita bloqueos CORS)
+ *     description: No se llama a mano — los campos "image"/"backdrop" que devuelven /search, /info y /catalog ya vienen con esta ruta y el token cifrado incluidos, ocultando el dominio real de la fuente.
  *     tags: [Utilidades]
  *     parameters:
  *       - in: query
- *         name: url
+ *         name: u
  *         required: true
  *         schema: { type: string }
+ *         description: Token cifrado (AES-256-GCM) generado por el backend, no una URL en texto plano.
  *     responses:
  *       200:
  *         description: Imagen servida (binario)

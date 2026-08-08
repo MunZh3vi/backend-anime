@@ -3,6 +3,7 @@ import { httpClient } from "../utils/httpClient";
 import { ApiError } from "../utils/ApiError";
 import { env } from "../config/env";
 import { requireQueryString } from "../utils/validators";
+import { decryptImageUrl } from "../utils/imageProxy";
 
 const PRIVATE_HOSTNAME_PATTERNS = [
   /^localhost$/i,
@@ -19,7 +20,7 @@ function assertSafeImageUrl(rawUrl: string): URL {
   try {
     parsed = new URL(rawUrl);
   } catch {
-    throw ApiError.badRequest("El parámetro 'url' no es una URL válida");
+    throw ApiError.badRequest("Token de imagen inválido");
   }
 
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
@@ -31,7 +32,8 @@ function assertSafeImageUrl(rawUrl: string): URL {
   }
 
   // Anti-SSRF: solo se permite proxear imágenes de dominios conocidos de las
-  // fuentes de scraping (configurable vía IMAGE_PROXY_ALLOWED_HOSTS).
+  // fuentes de scraping (configurable vía IMAGE_PROXY_ALLOWED_HOSTS). Se
+  // mantiene como defensa en profundidad aunque el token ya venga cifrado.
   const isAllowed = env.imageProxyAllowedHosts.some(
     (host) => parsed.hostname === host || parsed.hostname.endsWith(`.${host}`)
   );
@@ -43,7 +45,8 @@ function assertSafeImageUrl(rawUrl: string): URL {
 }
 
 export async function proxyImage(req: Request, res: Response) {
-  const rawUrl = requireQueryString(req.query.url, "url");
+  const token = requireQueryString(req.query.u, "u");
+  const rawUrl = decryptImageUrl(token);
   const target = assertSafeImageUrl(rawUrl);
 
   const upstream = await httpClient
