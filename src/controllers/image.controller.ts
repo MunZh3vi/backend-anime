@@ -2,7 +2,6 @@ import { Request, Response } from "express";
 import { httpClient } from "../utils/httpClient";
 import { ApiError } from "../utils/ApiError";
 import { env } from "../config/env";
-import { requireQueryString } from "../utils/validators";
 import { decryptImageUrl } from "../utils/imageProxy";
 
 const PRIVATE_HOSTNAME_PATTERNS = [
@@ -45,8 +44,21 @@ function assertSafeImageUrl(rawUrl: string): URL {
 }
 
 export async function proxyImage(req: Request, res: Response) {
-  const token = requireQueryString(req.query.u, "u");
-  const rawUrl = decryptImageUrl(token);
+  const token = req.query.u;
+  const legacyUrl = req.query.url;
+
+  let rawUrl: string;
+  if (typeof token === "string" && token) {
+    rawUrl = decryptImageUrl(token);
+  } else if (typeof legacyUrl === "string" && legacyUrl) {
+    // Compat: favoritos/watchlist/historial guardados antes de cifrar las
+    // URLs (o un frontend todavía sin actualizar) traen la URL cruda. Se
+    // sigue validando contra la lista blanca igual que el token cifrado.
+    rawUrl = legacyUrl;
+  } else {
+    throw ApiError.badRequest("Se requiere el parámetro 'u' (o 'url' por compatibilidad)");
+  }
+
   const target = assertSafeImageUrl(rawUrl);
 
   const upstream = await httpClient
