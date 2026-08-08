@@ -1,10 +1,55 @@
 import { Router } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
-import { catalog, episode, info, resolve, search } from "../controllers/anime.controller";
+import { catalog, episode, info, resolve, search, status } from "../controllers/anime.controller";
 import { proxyImage } from "../controllers/image.controller";
 import { createBatch, createDownload, getBatch, getDownload } from "../controllers/download.controller";
 
 export const animeRouter = Router();
+
+/**
+ * @openapi
+ * /v1/anime/status:
+ *   get:
+ *     summary: Estado en vivo de cada proveedor de scraping (búsqueda y, para AnimeFLV/AnimeAV1, si hay servidores de video reales)
+ *     tags: [Utilidades]
+ *     description: Corre una búsqueda de prueba en cada proveedor y, para AnimeFLV/AnimeAV1, además revisa un episodio fijo (Naruto ep. 1) para saber si hay enlaces de video reales. Resultado cacheado 60s.
+ *     responses:
+ *       200:
+ *         description: Estado por proveedor
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     checkedAt: { type: string, format: date-time }
+ *                     providers:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           provider: { type: string, example: animeflv }
+ *                           label: { type: string, example: AnimeFLV }
+ *                           search:
+ *                             type: object
+ *                             properties:
+ *                               ok: { type: boolean }
+ *                               resultCount: { type: integer }
+ *                               responseTimeMs: { type: integer }
+ *                               error: { type: string, nullable: true }
+ *                           episodes:
+ *                             type: object
+ *                             nullable: true
+ *                             properties:
+ *                               ok: { type: boolean }
+ *                               hasVideoLinks: { type: boolean }
+ *                               responseTimeMs: { type: integer }
+ *                               error: { type: string, nullable: true }
+ */
+animeRouter.get("/status", asyncHandler(status));
 
 /**
  * @openapi

@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { ApiError } from "../utils/ApiError";
+import { sendSuccess } from "../utils/response";
 import { cacheWrap } from "../cache/cacheManager";
 import { CACHE_TTL } from "../config/constants";
 import * as animeService from "../services/anime.service";
@@ -25,6 +26,69 @@ const CATALOG_PROVIDERS: Record<string, unknown> = {
   hentaila: hentailaService,
   animeav1: animeav1Service,
 };
+
+const STATUS_TEST_QUERY = "naruto";
+
+// Naruto ep. 1 es un fixture estable (siempre existe, numeración fija) para
+// verificar si un proveedor está devolviendo servidores de video reales o no.
+const STATUS_EPISODE_TEST_URLS: Record<string, string> = {
+  animeflv: "https://animeflv.net/ver/naruto-1",
+  animeav1: "https://animeav1.com/media/naruto/1",
+};
+
+interface ProviderStatusCheck {
+  ok: boolean;
+  responseTimeMs: number;
+  error: string | null;
+}
+
+interface ProviderStatusResult {
+  provider: string;
+  label: string;
+  search: ProviderStatusCheck & { resultCount: number };
+  episodes: (ProviderStatusCheck & { hasVideoLinks: boolean }) | null;
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+async function checkProviderStatus(providerId: string, label: string): Promise<ProviderStatusResult> {
+  const searchStart = Date.now();
+  let search: ProviderStatusResult["search"];
+  try {
+    const result = await animeService.searchAnime(STATUS_TEST_QUERY, providerId);
+    search = { ok: true, resultCount: result.data.results.length, responseTimeMs: Date.now() - searchStart, error: null };
+  } catch (err) {
+    search = { ok: false, resultCount: 0, responseTimeMs: Date.now() - searchStart, error: errorMessage(err) };
+  }
+
+  let episodes: ProviderStatusResult["episodes"] = null;
+  const episodeUrl = STATUS_EPISODE_TEST_URLS[providerId];
+  if (episodeUrl) {
+    const epStart = Date.now();
+    try {
+      const result = await animeService.getEpisodeLinks(episodeUrl);
+      const hasVideoLinks = result.data.streamLinks.SUB.length > 0 || result.data.streamLinks.DUB.length > 0;
+      episodes = { ok: true, hasVideoLinks, responseTimeMs: Date.now() - epStart, error: null };
+    } catch (err) {
+      episodes = { ok: false, hasVideoLinks: false, responseTimeMs: Date.now() - epStart, error: errorMessage(err) };
+    }
+  }
+
+  return { provider: providerId, label, search, episodes };
+}
+
+export async function status(_req: Request, res: Response) {
+  const providers = animeService.listProviders();
+
+  const result = await cacheWrap("anime:status", 60, async () => ({
+    checkedAt: new Date().toISOString(),
+    providers: await Promise.all(providers.map((p) => checkProviderStatus(p.id, p.label))),
+  }));
+
+  sendSuccess(res, result);
+}
 
 export async function search(req: Request, res: Response) {
   const { q, domain } = req.query;
