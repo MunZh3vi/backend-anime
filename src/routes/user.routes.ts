@@ -214,6 +214,7 @@ userRouter.delete("/watchlist/:animeId", asyncHandler(watchlistController.remove
  *               episodeId: { type: string }
  *               episodeTitle: { type: string }
  *               progress: { type: integer, description: "Segundos vistos" }
+ *               duration: { type: integer, description: "Duración total del episodio en segundos, para calcular el % visto" }
  *     responses:
  *       201: { description: Visualización registrada }
  */

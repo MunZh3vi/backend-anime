@@ -24,6 +24,7 @@ export const historyBodySchema = z.object({
   episodeId: z.string().trim().min(1, "episodeId es requerido"),
   episodeTitle: z.string().trim().min(1, "episodeTitle es requerido"),
   progress: z.number().int().min(0).optional(),
+  duration: z.number().int().min(0).optional(),
 });
 
 export const paginationQuerySchema = z.object({

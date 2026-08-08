@@ -10,6 +10,9 @@ import { errorHandler, notFoundHandler } from "./middlewares/errorHandler";
 import { apiV1Router } from "./routes";
 import { authRouter } from "./routes/auth.routes";
 import { userRouter } from "./routes/user.routes";
+import { publicUsersRouter } from "./routes/publicUsers.routes";
+import { commentRouter } from "./routes/comment.routes";
+import { ratingRouter } from "./routes/rating.routes";
 import { swaggerSpec } from "./docs/swagger";
 import { getDownloadsDir } from "./services/download.service";
 
@@ -46,6 +49,9 @@ app.use(
 app.use("/api/v1", apiV1Router);
 app.use("/api/auth", authRouter);
 app.use("/api/user", userRouter);
+app.use("/api/users", publicUsersRouter);
+app.use("/api/comments", commentRouter);
+app.use("/api/ratings", ratingRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

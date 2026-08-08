@@ -10,6 +10,9 @@ export const updateProfileSchema = z.object({
     .optional(),
   avatarUrl: z.string().trim().url("La URL del avatar no es válida").optional(),
   bio: z.string().trim().max(500, "La bio no puede superar 500 caracteres").optional(),
+  // FRIENDS se acepta y se guarda, pero hoy se trata igual que PRIVATE al
+  // resolver qué puede ver un visitante (no existe un sistema de amistades).
+  profileVisibility: z.enum(["PUBLIC", "FRIENDS", "PRIVATE"]).optional(),
 });
 
 export const changePasswordSchema = z

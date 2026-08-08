@@ -17,6 +17,7 @@ export interface PublicUser {
   bio: string | null;
   subscriptionStatus: string;
   isEmailVerified: boolean;
+  profileVisibility: "PUBLIC" | "FRIENDS" | "PRIVATE";
   createdAt: Date;
 }
 
@@ -35,6 +36,7 @@ function toPublicUser(user: User): PublicUser {
     bio: user.bio,
     subscriptionStatus: user.subscriptionStatus,
     isEmailVerified: user.isEmailVerified,
+    profileVisibility: user.profileVisibility,
     createdAt: user.createdAt,
   };
 }

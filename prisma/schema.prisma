@@ -12,6 +12,12 @@ datasource db {
   provider = "postgresql"
 }
 
+enum ProfileVisibility {
+  PUBLIC
+  FRIENDS
+  PRIVATE
+}
+
 model User {
   id           String  @id @default(uuid())
   email        String  @unique
@@ -21,6 +27,10 @@ model User {
   bio          String?
 
   subscriptionStatus String @default("free") @map("subscription_status")
+
+  // FRIENDS se comporta igual que PRIVATE hasta que exista un sistema de
+  // amistades: se deja modelado desde ya para no requerir otra migración.
+  profileVisibility ProfileVisibility @default(PRIVATE) @map("profile_visibility")
 
   isEmailVerified          Boolean   @default(false) @map("is_email_verified")
   emailVerificationToken   String?   @unique @map("email_verification_token")
@@ -33,6 +43,9 @@ model User {
   favorites     Favorite[]
   watchlist     WatchlistItem[]
   history       WatchHistoryEntry[]
+  comments      Comment[]
+  commentLikes  CommentLike[]
+  ratings       Rating[]
 
   @@map("users")
 }
@@ -92,6 +105,7 @@ model WatchHistoryEntry {
   episodeId       String   @map("episode_id")
   episodeTitle    String   @map("episode_title")
   progressSeconds Int?     @map("progress_seconds")
+  durationSeconds Int?     @map("duration_seconds")
   watchedAt       DateTime @default(now()) @updatedAt @map("watched_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -99,4 +113,61 @@ model WatchHistoryEntry {
   @@unique([userId, episodeId])
   @@index([userId, watchedAt])
   @@map("watch_history")
+}
+
+// Comentarios por anime y, opcionalmente, por episodio (episodeId null =
+// comentario general de la ficha). Con hilos: parentId apunta al comentario
+// padre. Borrado es lógico (deletedAt) para no huerfanar respuestas cuando
+// se borra un comentario que tiene hijos.
+model Comment {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  animeId   String    @map("anime_id")
+  episodeId String?   @map("episode_id")
+  parentId  String?   @map("parent_id")
+  content   String
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent  Comment?      @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies Comment[]     @relation("CommentReplies")
+  likes   CommentLike[]
+
+  @@index([animeId, episodeId, parentId])
+  @@index([parentId])
+  @@map("comments")
+}
+
+model CommentLike {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  commentId String   @map("comment_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, commentId])
+  @@index([commentId])
+  @@map("comment_likes")
+}
+
+// Calificación propia de un usuario (1-10), separada del "score" que ya
+// viene de los proveedores (AnimeFLV/AnimeAV1/etc). La ficha puede mostrar
+// ambas notas por separado.
+model Rating {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  animeId   String   @map("anime_id")
+  score     Int
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, animeId])
+  @@index([animeId])
+  @@map("ratings")
 }

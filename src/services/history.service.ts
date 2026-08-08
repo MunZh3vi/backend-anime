@@ -35,12 +35,14 @@ export function recordHistoryEntry(userId: string, input: HistoryInput) {
       episodeId: input.episodeId,
       episodeTitle: input.episodeTitle,
       progressSeconds: input.progress,
+      durationSeconds: input.duration,
     },
     update: {
       animeTitle: input.animeTitle,
       image: input.image,
       episodeTitle: input.episodeTitle,
       progressSeconds: input.progress,
+      durationSeconds: input.duration,
       // watchedAt se actualiza solo por @updatedAt al tocar la fila.
     },
   });

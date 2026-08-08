@@ -31,3 +31,22 @@ export function authenticate(req: Request, _res: Response, next: NextFunction) {
   req.userId = payload.sub;
   next();
 }
+
+/**
+ * Igual que `authenticate`, pero no falla si no hay token: lo usan rutas
+ * públicas (perfil público, ratings) que necesitan saber "¿quién pregunta?"
+ * para decidir qué mostrar (ej. el dueño del perfil ve su propio contenido
+ * privado) sin exigir sesión a cualquier visitante anónimo.
+ */
+export function optionalAuthenticate(req: Request, _res: Response, next: NextFunction) {
+  const token = extractAccessToken(req);
+  if (!token) return next();
+
+  try {
+    const payload = verifyAccessToken(token);
+    req.userId = payload.sub;
+  } catch {
+    // Token inválido/expirado: se sigue como anónimo en vez de fallar.
+  }
+  next();
+}

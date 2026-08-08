@@ -12,6 +12,8 @@ import * as monoschinosService from "../services/monoschinos.service";
 import * as hentailaService from "../services/hentaila.service";
 import { resolveEmbedUrl } from "../utils/resolvers/resolvers";
 import { rewriteImageUrlsDeep } from "../utils/imageProxy";
+import { getArtworkByMalId } from "../services/anilist.service";
+import type { AnimeInfoData, ProviderResponse } from "../types/provider.types";
 
 type CatalogCapable = { getCatalog?: (page?: unknown, genre?: unknown) => Promise<unknown> };
 
@@ -97,14 +99,39 @@ export async function search(req: Request, res: Response) {
   res.status(200).json(rewriteImageUrlsDeep(result));
 }
 
+/**
+ * Los covers/backdrops de los sitios de streaming están pensados para
+ * grillas chicas (poster ~225x309, backdrop casi siempre null). Si el
+ * proveedor nos dio un malId, se pide a AniList un cover más pesado y un
+ * banner ancho de verdad, y se usan en vez de (o además de) lo scrapeado.
+ */
+async function enrichWithAniListArtwork(result: ProviderResponse<AnimeInfoData>): Promise<ProviderResponse<AnimeInfoData>> {
+  const malId = Number(result.data.malId);
+  if (!Number.isFinite(malId) || malId <= 0) return result;
+
+  const artwork = await getArtworkByMalId(malId);
+  if (!artwork) return result;
+
+  return {
+    ...result,
+    data: {
+      ...result.data,
+      image: artwork.cover ?? result.data.image,
+      backdrop: artwork.banner ?? result.data.backdrop,
+    },
+  };
+}
+
 export async function info(req: Request, res: Response) {
   if (!req.query.url) throw ApiError.badRequest("Se requiere el parametro url");
   // El rewrite de imágenes va DENTRO del factory: cacheManager no clona, así
   // que si se reescribiera después de leer del caché, en el segundo hit se
   // re-cifraría un valor que ya es la ruta proxeada (doble envoltura rota).
-  const result = await cacheWrap(`anime:info:${req.query.url}`, CACHE_TTL.CATALOG, async () =>
-    rewriteImageUrlsDeep(await animeService.getAnimeInfo(req.query.url))
-  );
+  const result = await cacheWrap(`anime:info:${req.query.url}`, CACHE_TTL.CATALOG, async () => {
+    const raw = await animeService.getAnimeInfo(req.query.url);
+    const enriched = await enrichWithAniListArtwork(raw);
+    return rewriteImageUrlsDeep(enriched);
+  });
   res.status(200).json(result);
 }
 

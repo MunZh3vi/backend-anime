@@ -24,6 +24,7 @@ export async function updateProfile(userId: string, input: UpdateProfileInput): 
       username: input.username,
       avatarUrl: input.avatarUrl,
       bio: input.bio,
+      profileVisibility: input.profileVisibility,
     },
   });
 
