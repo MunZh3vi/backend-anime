@@ -206,9 +206,11 @@ userRouter.delete("/watchlist/:animeId", asyncHandler(watchlistController.remove
  *         application/json:
  *           schema:
  *             type: object
- *             required: [animeId, episodeId, episodeTitle]
+ *             required: [animeId, animeTitle, episodeId, episodeTitle]
  *             properties:
  *               animeId: { type: string }
+ *               animeTitle: { type: string }
+ *               image: { type: string, description: "URL absoluta o ruta ya proxeada (/api/v1/anime/image-proxy?u=...)" }
  *               episodeId: { type: string }
  *               episodeTitle: { type: string }
  *               progress: { type: integer, description: "Segundos vistos" }

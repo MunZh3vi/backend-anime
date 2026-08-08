@@ -87,6 +87,8 @@ model WatchHistoryEntry {
   id              String   @id @default(uuid())
   userId          String   @map("user_id")
   animeId         String   @map("anime_id")
+  animeTitle      String   @map("anime_title")
+  image           String?
   episodeId       String   @map("episode_id")
   episodeTitle    String   @map("episode_title")
   progressSeconds Int?     @map("progress_seconds")

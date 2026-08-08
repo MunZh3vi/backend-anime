@@ -30,11 +30,15 @@ export function recordHistoryEntry(userId: string, input: HistoryInput) {
     create: {
       userId,
       animeId: input.animeId,
+      animeTitle: input.animeTitle,
+      image: input.image,
       episodeId: input.episodeId,
       episodeTitle: input.episodeTitle,
       progressSeconds: input.progress,
     },
     update: {
+      animeTitle: input.animeTitle,
+      image: input.image,
       episodeTitle: input.episodeTitle,
       progressSeconds: input.progress,
       // watchedAt se actualiza solo por @updatedAt al tocar la fila.
