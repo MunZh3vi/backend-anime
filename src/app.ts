@@ -15,6 +15,11 @@ import { getDownloadsDir } from "./services/download.service";
 
 export const app = express();
 
+// Railway (y la mayoría de PaaS) corren la app detrás de un único proxy
+// inverso que setea X-Forwarded-For. Sin esto, express-rate-limit rechaza
+// las requests con ERR_ERL_UNEXPECTED_X_FORWARDED_FOR por posible IP-spoofing.
+app.set("trust proxy", 1);
+
 app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(corsMiddleware);
 app.use(express.json({ limit: "1mb" }));

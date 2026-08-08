@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Backend API (scraping) para catálogo de anime, estilo Crunchyroll, con fuentes AnimeFLV y AnimeAV1.",
   "main": "dist/server.js",
+  "type": "commonjs",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
