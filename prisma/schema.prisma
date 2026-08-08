@@ -1,9 +1,11 @@
 // Prisma schema — backend de anime (usuarios, favoritos, watchlist, historial)
 // Docs: https://pris.ly/d/prisma-schema
 
+// Generador clásico (prisma-client-js), no el nuevo "prisma-client": este
+// último emite `import.meta.url` incluso al compilar a CommonJS, lo cual
+// rompe en Node al ejecutarse en Linux (no se manifestaba en Windows).
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {

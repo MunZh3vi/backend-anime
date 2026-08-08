@@ -5,5 +5,3 @@ downloads/
 *.log
 npm-debug.log*
 .DS_Store
-
-/src/generated/prisma

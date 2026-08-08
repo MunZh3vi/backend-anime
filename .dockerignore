@@ -8,7 +8,3 @@ downloads
 .git
 .gitignore
 npm-debug.log*
-# El cliente de Prisma se regenera dentro del contenedor (npm ci -> postinstall).
-# Si se copia el generado en el host (binarios de Windows/macOS), rompe el
-# cliente ya generado para Linux dentro de la imagen.
-src/generated

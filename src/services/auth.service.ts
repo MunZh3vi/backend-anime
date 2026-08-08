@@ -6,7 +6,7 @@ import { logger } from "../utils/logger";
 import { hashPassword, verifyPassword } from "../utils/password";
 import { signAccessToken } from "../utils/jwt";
 import { generateRefreshToken, hashRefreshToken } from "../utils/refreshToken";
-import type { UserModel as User } from "../generated/prisma/models";
+import type { User } from "@prisma/client";
 import type { LoginInput, RegisterInput } from "../validators/auth.validators";
 
 export interface PublicUser {
