@@ -8,7 +8,7 @@ export const animeRouter = Router();
 
 /**
  * @openapi
- * /anime/image-proxy:
+ * /v1/anime/image-proxy:
  *   get:
  *     summary: Proxy de imágenes (sin autenticación, evita bloqueos CORS)
  *     tags: [Utilidades]
@@ -30,7 +30,7 @@ animeRouter.get("/image-proxy", asyncHandler(proxyImage));
 
 /**
  * @openapi
- * /anime/search:
+ * /v1/anime/search:
  *   get:
  *     summary: Búsqueda de animes (unificada en todos los proveedores, o uno específico vía domain)
  *     tags: [Búsqueda]
@@ -66,7 +66,7 @@ animeRouter.get("/search", asyncHandler(search));
 
 /**
  * @openapi
- * /anime/info:
+ * /v1/anime/info:
  *   get:
  *     summary: Información de un anime (sinopsis, géneros, episodios)
  *     tags: [Detalle]
@@ -92,7 +92,7 @@ animeRouter.get("/info", asyncHandler(info));
 
 /**
  * @openapi
- * /anime/episode:
+ * /v1/anime/episode:
  *   get:
  *     summary: Enlaces de streaming/descarga de un episodio
  *     tags: [Reproducción]
@@ -125,7 +125,7 @@ animeRouter.get("/episode", asyncHandler(episode));
 
 /**
  * @openapi
- * /anime/catalog:
+ * /v1/anime/catalog:
  *   get:
  *     summary: Catálogo / tendencias por proveedor
  *     tags: [Catálogo]
@@ -156,7 +156,7 @@ animeRouter.get("/catalog", asyncHandler(catalog));
 
 /**
  * @openapi
- * /anime/resolve:
+ * /v1/anime/resolve:
  *   get:
  *     summary: Resuelve un embed (StreamTape/VOE/StreamWish/etc.) a su URL directa reproducible
  *     tags: [Reproducción]
@@ -181,7 +181,7 @@ animeRouter.get("/resolve", asyncHandler(resolve));
 
 /**
  * @openapi
- * /anime/download:
+ * /v1/anime/download:
  *   post:
  *     summary: Encola la descarga de un episodio a disco (guarda el archivo en el servidor)
  *     tags: [Descargas]
@@ -193,7 +193,7 @@ animeRouter.post("/download", asyncHandler(createDownload));
 
 /**
  * @openapi
- * /anime/download/{id}:
+ * /v1/anime/download/{id}:
  *   get:
  *     summary: Estado de una descarga
  *     tags: [Descargas]
@@ -210,7 +210,7 @@ animeRouter.get("/download/:id", asyncHandler(getDownload));
 
 /**
  * @openapi
- * /anime/batch-download:
+ * /v1/anime/batch-download:
  *   post:
  *     summary: Encola la descarga de varios episodios de un anime
  *     tags: [Descargas]
@@ -222,7 +222,7 @@ animeRouter.post("/batch-download", asyncHandler(createBatch));
 
 /**
  * @openapi
- * /anime/batch/{id}:
+ * /v1/anime/batch/{id}:
  *   get:
  *     summary: Estado de un lote de descargas
  *     tags: [Descargas]

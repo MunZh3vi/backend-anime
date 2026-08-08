@@ -10,9 +10,30 @@ const options: swaggerJsdoc.Options = {
       description:
         "API de catálogo de anime (scraping multi-proveedor: AnimeAV1, AnimeFLV, JKAnime, TioAnime, MonosChinos, HentaiLA). Los videos NO se alojan en este servidor, solo se devuelven enlaces externos.",
     },
-    servers: [{ url: "/api/v1", description: "Base path de la API" }],
+    servers: [{ url: "/api", description: "Base path de la API" }],
     components: {
+      securitySchemes: {
+        cookieAuth: {
+          type: "apiKey",
+          in: "cookie",
+          name: "accessToken",
+          description: "Cookie HttpOnly seteada por /auth/login o /auth/register. También se acepta Authorization: Bearer <accessToken>.",
+        },
+      },
       schemas: {
+        User: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            email: { type: "string" },
+            username: { type: "string" },
+            avatarUrl: { type: "string", nullable: true },
+            bio: { type: "string", nullable: true },
+            subscriptionStatus: { type: "string", example: "free" },
+            isEmailVerified: { type: "boolean" },
+            createdAt: { type: "string", format: "date-time" },
+          },
+        },
         SearchResultItem: {
           type: "object",
           properties: {

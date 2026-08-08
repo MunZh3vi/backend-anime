@@ -12,8 +12,12 @@ USER root
 WORKDIR /app
 
 COPY package*.json ./
+COPY prisma ./prisma
+COPY prisma.config.ts ./
 # NODE_ENV todavía no está en "production" acá a propósito: npm necesita
 # instalar devDependencies (typescript) para poder compilar con tsc.
+# El postinstall (prisma generate) corre acá porque prisma/schema.prisma
+# ya está copiado en este punto.
 RUN npm ci
 
 COPY . .
@@ -29,4 +33,5 @@ ENV NODE_ENV=production
 USER pptruser
 
 EXPOSE 4000
-CMD ["npm", "start"]
+# Aplica migraciones pendientes contra DATABASE_URL y recién ahí arranca.
+CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]

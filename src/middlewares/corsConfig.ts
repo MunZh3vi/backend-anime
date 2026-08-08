@@ -14,5 +14,8 @@ export const corsMiddleware = cors({
     logger.warn(`CORS bloqueado para origin: ${origin}`);
     return callback(new Error("No permitido por CORS"));
   },
-  methods: ["GET", "OPTIONS"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  // Necesario para que el navegador envíe/reciba las cookies HttpOnly de auth
+  // en peticiones cross-site (frontend y backend en dominios distintos).
+  credentials: true,
 });

@@ -1,0 +1,98 @@
+// Prisma schema — backend de anime (usuarios, favoritos, watchlist, historial)
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String  @id @default(uuid())
+  email        String  @unique
+  username     String  @unique
+  passwordHash String  @map("password_hash")
+  avatarUrl    String? @map("avatar_url")
+  bio          String?
+
+  subscriptionStatus String @default("free") @map("subscription_status")
+
+  isEmailVerified          Boolean   @default(false) @map("is_email_verified")
+  emailVerificationToken   String?   @unique @map("email_verification_token")
+  emailVerificationExpires DateTime? @map("email_verification_expires")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  refreshTokens RefreshToken[]
+  favorites     Favorite[]
+  watchlist     WatchlistItem[]
+  history       WatchHistoryEntry[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model Favorite {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  animeId   String   @map("anime_id")
+  title     String
+  image     String?
+  rating    Float?
+  type      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, animeId])
+  @@map("favorites")
+}
+
+model WatchlistItem {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  animeId   String   @map("anime_id")
+  title     String
+  image     String?
+  rating    Float?
+  type      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, animeId])
+  @@map("watchlist_items")
+}
+
+model WatchHistoryEntry {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  animeId         String   @map("anime_id")
+  episodeId       String   @map("episode_id")
+  episodeTitle    String   @map("episode_title")
+  progressSeconds Int?     @map("progress_seconds")
+  watchedAt       DateTime @default(now()) @updatedAt @map("watched_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, episodeId])
+  @@index([userId, watchedAt])
+  @@map("watch_history")
+}
