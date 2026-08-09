@@ -60,7 +60,7 @@ authRouter.post("/register", authRateLimiter, validate(registerSchema), asyncHan
  *               password: { type: string, format: password }
  *     responses:
  *       200:
- *         description: Sesión iniciada (setea cookies), o si el usuario tiene 2FA activo, { twoFactorRequired: true, challengeToken } en vez de las cookies — completar con POST /auth/login/2fa.
+ *         description: "Sesión iniciada (setea cookies), o si el usuario tiene 2FA activo: twoFactorRequired=true + challengeToken en vez de las cookies, completar con POST /auth/login/2fa."
  *       401:
  *         description: Credenciales inválidas
  *         content:
