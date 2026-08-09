@@ -31,6 +31,17 @@ export interface EpisodeRef {
   url: string | null;
 }
 
+// "type" es el código numérico de relación tal cual lo expone la fuente
+// (AnimeAV1 lo hereda de AniDB): no lo traducimos a texto porque no hay
+// forma confiable de mapearlo sin arriesgar una etiqueta incorrecta.
+export interface RelatedAnimeItem {
+  type: number | null;
+  title: string;
+  slug: string | null;
+  url: string | null;
+  startDate: string | null;
+}
+
 export interface AnimeInfoData {
   id: string | number | null;
   title: string | null;
@@ -50,6 +61,8 @@ export interface AnimeInfoData {
   trailer: string | null;
   genres: GenreInfo[];
   episodes: EpisodeRef[];
+  // Solo AnimeAV1 la expone hoy; el resto de los proveedores la dejan undefined.
+  relations?: RelatedAnimeItem[];
 }
 
 export interface VideoLink {

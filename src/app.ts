@@ -13,8 +13,13 @@ import { userRouter } from "./routes/user.routes";
 import { publicUsersRouter } from "./routes/publicUsers.routes";
 import { commentRouter } from "./routes/comment.routes";
 import { ratingRouter } from "./routes/rating.routes";
+import { moderationRouter } from "./routes/moderation.routes";
+import { notificationRouter } from "./routes/notification.routes";
 import { swaggerSpec } from "./docs/swagger";
 import { getDownloadsDir } from "./services/download.service";
+import { attachSentryErrorHandler, initSentry } from "./config/sentry";
+
+initSentry();
 
 export const app = express();
 
@@ -52,6 +57,20 @@ app.use("/api/user", userRouter);
 app.use("/api/users", publicUsersRouter);
 app.use("/api/comments", commentRouter);
 app.use("/api/ratings", ratingRouter);
+app.use("/api/moderation", moderationRouter);
+app.use("/api/notifications", notificationRouter);
+
+// Alias versionados (aditivo, no reemplaza lo anterior): /api/v1/anime/* ya
+// estaba versionado, el resto no. Se agregan los equivalentes /api/v1/* sin
+// quitar las rutas sin versionar, que el frontend ya integró según el README.
+app.use("/api/v1/auth", authRouter);
+app.use("/api/v1/user", userRouter);
+app.use("/api/v1/users", publicUsersRouter);
+app.use("/api/v1/comments", commentRouter);
+app.use("/api/v1/ratings", ratingRouter);
+app.use("/api/v1/moderation", moderationRouter);
+app.use("/api/v1/notifications", notificationRouter);
 
 app.use(notFoundHandler);
+attachSentryErrorHandler(app);
 app.use(errorHandler);

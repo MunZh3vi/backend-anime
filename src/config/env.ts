@@ -37,6 +37,9 @@ export const env = {
   bcryptSaltRounds: num(process.env.BCRYPT_SALT_ROUNDS, 12),
 
   imageProxySecret: resolveSecret("IMAGE_PROXY_SECRET"),
+
+  // Opcional: sin definir, Sentry queda completamente desactivado (no-op).
+  sentryDsn: process.env.SENTRY_DSN || null,
 } as const;
 
 export const isProd = env.nodeEnv === "production";

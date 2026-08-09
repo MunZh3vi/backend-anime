@@ -18,6 +18,12 @@ enum ProfileVisibility {
   PRIVATE
 }
 
+enum Role {
+  USER
+  MODERATOR
+  ADMIN
+}
+
 model User {
   id           String  @id @default(uuid())
   email        String  @unique
@@ -27,6 +33,19 @@ model User {
   bio          String?
 
   subscriptionStatus String @default("free") @map("subscription_status")
+  role               Role   @default(USER)
+
+  bannedAt  DateTime? @map("banned_at")
+  banReason String?   @map("ban_reason")
+
+  // TOTP (Google Authenticator y similares). El secreto solo se guarda una
+  // vez confirmado con un código válido en /user/2fa/enable.
+  twoFactorSecret  String? @map("two_factor_secret")
+  twoFactorEnabled Boolean @default(false) @map("two_factor_enabled")
+
+  // Gatea el acceso a proveedores +18 (hoy, HentaiLA). Default false: hay
+  // que optar explícitamente, no al revés.
+  matureContentEnabled Boolean @default(false) @map("mature_content_enabled")
 
   // FRIENDS se comporta igual que PRIVATE hasta que exista un sistema de
   // amistades: se deja modelado desde ya para no requerir otra migración.
@@ -39,13 +58,15 @@ model User {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  refreshTokens RefreshToken[]
-  favorites     Favorite[]
-  watchlist     WatchlistItem[]
-  history       WatchHistoryEntry[]
-  comments      Comment[]
-  commentLikes  CommentLike[]
-  ratings       Rating[]
+  refreshTokens   RefreshToken[]
+  favorites       Favorite[]
+  watchlist       WatchlistItem[]
+  history         WatchHistoryEntry[]
+  comments        Comment[]
+  commentLikes    CommentLike[]
+  ratings         Rating[]
+  commentReports  CommentReport[]
+  notifications   Notification[]
 
   @@map("users")
 }
@@ -54,6 +75,10 @@ model RefreshToken {
   id        String    @id @default(uuid())
   userId    String    @map("user_id")
   tokenHash String    @unique @map("token_hash")
+  // Metadata de sesión: qué dispositivo/IP la generó, para que el usuario
+  // pueda reconocer y cerrar sesiones individuales desde /user/sessions.
+  userAgent String?   @map("user_agent")
+  ipAddress String?   @map("ip_address")
   expiresAt DateTime  @map("expires_at")
   revokedAt DateTime? @map("revoked_at")
   createdAt DateTime  @default(now()) @map("created_at")
@@ -170,4 +195,63 @@ model Rating {
   @@unique([userId, animeId])
   @@index([animeId])
   @@map("ratings")
+}
+
+enum ReportStatus {
+  PENDING
+  RESOLVED
+  DISMISSED
+}
+
+model CommentReport {
+  id         String       @id @default(uuid())
+  commentId  String       @map("comment_id")
+  reporterId String       @map("reporter_id")
+  reason     String
+  status     ReportStatus @default(PENDING)
+  createdAt  DateTime     @default(now()) @map("created_at")
+  resolvedAt DateTime?    @map("resolved_at")
+
+  reporter User @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+
+  // Sin relación a Comment con onDelete: Cascade a propósito: el reporte
+  // debe sobrevivir aunque el comentario se borre (borrado lógico igual lo
+  // deja disponible, pero por si el dato se purga después).
+  @@unique([commentId, reporterId])
+  @@index([status])
+  @@map("comment_reports")
+}
+
+enum NotificationType {
+  COMMENT_REPLY
+  NEW_EPISODE
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String           @map("user_id")
+  type      NotificationType
+  title     String
+  body      String
+  // Datos libres para que el frontend arme el link (animeId, episodeId,
+  // commentId, según el tipo) sin necesitar una tabla por tipo de evento.
+  data      Json?
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read, createdAt])
+  @@map("notifications")
+}
+
+// Último conteo de episodios visto para un anime en watchlist de alguien.
+// El cron de notificaciones lo compara contra el conteo actual del scraper
+// para detectar episodios nuevos sin volver a notificar los mismos.
+model AnimeEpisodeTracker {
+  animeId          String   @id @map("anime_id")
+  lastEpisodeCount Int      @map("last_episode_count")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("anime_episode_trackers")
 }

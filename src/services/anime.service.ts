@@ -10,6 +10,19 @@ import { AnimeInfoData, AnimeProvider, EpisodeLinksData, ProviderResponse, Searc
 
 const DEFAULT_ANIME_DOMAIN = process.env.DEFAULT_ANIME_DOMAIN || "animeav1.com";
 
+// Proveedores de contenido +18: solo se sirven si quien pregunta activó
+// matureContentEnabled en su perfil (default false). Gatea tanto la
+// búsqueda multi-proveedor como el acceso directo por domain/provider/URL.
+const MATURE_PROVIDER_IDS = new Set(["hentaila"]);
+
+function assertMatureAllowed(providerId: string, allowMature: boolean): void {
+  if (MATURE_PROVIDER_IDS.has(providerId) && !allowMature) {
+    throw ApiError.forbidden(
+      "Este proveedor es contenido para adultos. Activá 'matureContentEnabled' en tu perfil (con sesión iniciada) para acceder."
+    );
+  }
+}
+
 interface ProviderEntry {
   id: string;
   label: string;
@@ -97,10 +110,15 @@ function findProviderForUrl(urlCandidate: unknown): ProviderEntry | null {
   }
 }
 
-export async function searchAnime(query: unknown, domainCandidate?: unknown): Promise<ProviderResponse<SearchData>> {
+export async function searchAnime(
+  query: unknown,
+  domainCandidate?: unknown,
+  allowMature = false
+): Promise<ProviderResponse<SearchData>> {
   const forcedProvider = findProviderByDomain(domainCandidate) || findProviderById(domainCandidate);
 
   if (forcedProvider) {
+    assertMatureAllowed(forcedProvider.id, allowMature);
     const result = await forcedProvider.service.searchAnime(query, forcedProvider.domains[0]);
     result.data.results.forEach((item: SearchResultItem) => {
       item.provider = forcedProvider.label;
@@ -109,9 +127,10 @@ export async function searchAnime(query: unknown, domainCandidate?: unknown): Pr
     return { ...result, source: result.source || forcedProvider.id };
   }
 
-  // Búsqueda unificada en paralelo en todos los proveedores
+  // Búsqueda unificada en paralelo en todos los proveedores permitidos.
+  const eligibleProviders = PROVIDERS.filter((p) => allowMature || !MATURE_PROVIDER_IDS.has(p.id));
   const searchResults = await Promise.all(
-    PROVIDERS.map(async (provider) => {
+    eligibleProviders.map(async (provider) => {
       try {
         const result = await provider.service.searchAnime(query, provider.domains[0]);
         const results = result.data.results || [];
@@ -155,16 +174,17 @@ export async function searchAnime(query: unknown, domainCandidate?: unknown): Pr
     return { ...firstEmptyResult, source: "Multi" };
   }
 
-  if (errors.length === PROVIDERS.length && errors[0] instanceof Error) {
+  if (errors.length === eligibleProviders.length && errors[0] instanceof Error) {
     throw errors[0];
   }
 
   throw ApiError.upstream("No se pudo completar la busqueda en proveedores");
 }
 
-export async function getAnimeInfo(urlCandidate: unknown): Promise<ProviderResponse<AnimeInfoData>> {
+export async function getAnimeInfo(urlCandidate: unknown, allowMature = false): Promise<ProviderResponse<AnimeInfoData>> {
   const provider = findProviderForUrl(urlCandidate) || PROVIDERS[0];
   if (!provider) throw ApiError.badRequest("Proveedor no soportado");
+  assertMatureAllowed(provider.id, allowMature);
 
   const result = await provider.service.getAnimeInfo(urlCandidate);
   return { ...result, source: result.source || provider.id };
@@ -173,10 +193,12 @@ export async function getAnimeInfo(urlCandidate: unknown): Promise<ProviderRespo
 export async function getEpisodeLinks(
   urlCandidate: unknown,
   includeMega?: unknown,
-  excludeServers?: unknown
+  excludeServers?: unknown,
+  allowMature = false
 ): Promise<ProviderResponse<EpisodeLinksData>> {
   const provider = findProviderForUrl(urlCandidate) || PROVIDERS[0];
   if (!provider) throw ApiError.badRequest("Proveedor no soportado");
+  assertMatureAllowed(provider.id, allowMature);
 
   const result = await provider.service.getEpisodeLinks(urlCandidate, includeMega, excludeServers);
   return { ...result, source: result.source || provider.id };
@@ -190,4 +212,10 @@ export function getProviderService(providerId: unknown): ProviderEntry["service"
 
 export function listProviders(): Array<{ id: string; label: string }> {
   return PROVIDERS.map(({ id, label }) => ({ id, label }));
+}
+
+/** Usado por trending/relacionados para no exponer HentaiLA a quien no la habilitó. */
+export function isMatureAnimeUrl(urlCandidate: unknown): boolean {
+  const provider = findProviderForUrl(urlCandidate);
+  return provider ? MATURE_PROVIDER_IDS.has(provider.id) : false;
 }

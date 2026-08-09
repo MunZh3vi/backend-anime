@@ -4,6 +4,8 @@ import { sendSuccess } from "../utils/response";
 import { cacheWrap } from "../cache/cacheManager";
 import { CACHE_TTL } from "../config/constants";
 import * as animeService from "../services/anime.service";
+import * as trendingService from "../services/trending.service";
+import { ANIME_GENRES } from "../constants/genres";
 import * as animeflvService from "../services/animeflv.service";
 import * as animeav1Service from "../services/animeav1.service";
 import * as jkanimeService from "../services/jkanime.service";
@@ -29,6 +31,8 @@ const CATALOG_PROVIDERS: Record<string, unknown> = {
   hentaila: hentailaService,
   animeav1: animeav1Service,
 };
+
+const MATURE_CATALOG_PROVIDERS = new Set(["hentaila"]);
 
 const STATUS_TEST_QUERY = "naruto";
 
@@ -95,7 +99,7 @@ export async function status(_req: Request, res: Response) {
 
 export async function search(req: Request, res: Response) {
   const { q, domain } = req.query;
-  const result = await animeService.searchAnime(q, domain);
+  const result = await animeService.searchAnime(q, domain, Boolean(req.matureContentEnabled));
   res.status(200).json(rewriteImageUrlsDeep(result));
 }
 
@@ -124,11 +128,14 @@ async function enrichWithAniListArtwork(result: ProviderResponse<AnimeInfoData>)
 
 export async function info(req: Request, res: Response) {
   if (!req.query.url) throw ApiError.badRequest("Se requiere el parametro url");
+  const allowMature = Boolean(req.matureContentEnabled);
   // El rewrite de imágenes va DENTRO del factory: cacheManager no clona, así
   // que si se reescribiera después de leer del caché, en el segundo hit se
   // re-cifraría un valor que ya es la ruta proxeada (doble envoltura rota).
-  const result = await cacheWrap(`anime:info:${req.query.url}`, CACHE_TTL.CATALOG, async () => {
-    const raw = await animeService.getAnimeInfo(req.query.url);
+  // La clave incluye allowMature: sin esto, una respuesta cacheada para un
+  // usuario con +18 habilitado se filtraría a cualquier otro visitante.
+  const result = await cacheWrap(`anime:info:${req.query.url}:${allowMature}`, CACHE_TTL.CATALOG, async () => {
+    const raw = await animeService.getAnimeInfo(req.query.url, allowMature);
     const enriched = await enrichWithAniListArtwork(raw);
     return rewriteImageUrlsDeep(enriched);
   });
@@ -137,35 +144,63 @@ export async function info(req: Request, res: Response) {
 
 export async function episode(req: Request, res: Response) {
   if (!req.query.url) throw ApiError.badRequest("Se requiere el parametro url");
+  const allowMature = Boolean(req.matureContentEnabled);
   const result = await cacheWrap(
-    `anime:episode:${req.query.url}:${req.query.includeMega}:${req.query.excludeServers}`,
+    `anime:episode:${req.query.url}:${req.query.includeMega}:${req.query.excludeServers}:${allowMature}`,
     CACHE_TTL.EPISODE,
-    () => animeService.getEpisodeLinks(req.query.url, req.query.includeMega, req.query.excludeServers)
+    () => animeService.getEpisodeLinks(req.query.url, req.query.includeMega, req.query.excludeServers, allowMature)
   );
   res.status(200).json(result);
 }
 
 export async function catalog(req: Request, res: Response) {
   const provider = String(req.query.provider || req.query.domain || "animeav1");
+  const allowMature = Boolean(req.matureContentEnabled);
+  if (MATURE_CATALOG_PROVIDERS.has(provider) && !allowMature) {
+    throw ApiError.forbidden(
+      "Este proveedor es contenido para adultos. Activá 'matureContentEnabled' en tu perfil (con sesión iniciada) para acceder."
+    );
+  }
+
   let service = CATALOG_PROVIDERS[provider] as CatalogCapable | undefined;
 
   if (!service || typeof service.getCatalog !== "function") {
     service = CATALOG_PROVIDERS.animeav1 as CatalogCapable;
   }
 
-  const result = await cacheWrap(`anime:catalog:${provider}:${req.query.page}:${req.query.genre}`, CACHE_TTL.CATALOG, async () => {
-    const raw = await service!.getCatalog!(req.query.page, req.query.genre);
-    const data = (raw as { data?: { results?: Array<Record<string, unknown>> } }).data;
-    if (data && Array.isArray(data.results)) {
-      for (const item of data.results) {
-        if (item.url) item.slug = item.url;
-        item.provider = provider;
+  const result = await cacheWrap(
+    `anime:catalog:${provider}:${req.query.page}:${req.query.genre}:${allowMature}`,
+    CACHE_TTL.CATALOG,
+    async () => {
+      const raw = await service!.getCatalog!(req.query.page, req.query.genre);
+      const data = (raw as { data?: { results?: Array<Record<string, unknown>> } }).data;
+      if (data && Array.isArray(data.results)) {
+        for (const item of data.results) {
+          if (item.url) item.slug = item.url;
+          item.provider = provider;
+        }
       }
+      return rewriteImageUrlsDeep(raw);
     }
-    return rewriteImageUrlsDeep(raw);
-  });
+  );
 
   res.status(200).json(result);
+}
+
+export async function genres(_req: Request, res: Response) {
+  sendSuccess(res, ANIME_GENRES);
+}
+
+export async function trending(req: Request, res: Response) {
+  const days = Math.min(Math.max(Number(req.query.days) || 7, 1), 30);
+  const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50);
+  const allowMature = Boolean(req.matureContentEnabled);
+
+  const result = await cacheWrap(`anime:trending:${days}:${limit}:${allowMature}`, CACHE_TTL.CATALOG, () =>
+    trendingService.getTrending(days, limit, allowMature)
+  );
+
+  sendSuccess(res, result);
 }
 
 interface ResolvedStream {

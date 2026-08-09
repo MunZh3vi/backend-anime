@@ -9,6 +9,7 @@ import {
   EpisodeRef,
   GenreInfo,
   ProviderResponse,
+  RelatedAnimeItem,
   SearchData,
   SearchResultItem,
   VariantLinks,
@@ -463,6 +464,30 @@ function normalizeGenres(genres: unknown): GenreInfo[] {
     .filter((genre): genre is GenreInfo => Boolean(genre && genre.name));
 }
 
+function normalizeRelations(relations: unknown, domain: string): RelatedAnimeItem[] {
+  if (!Array.isArray(relations)) return [];
+
+  return relations
+    .map((relation): RelatedAnimeItem | null => {
+      if (!isObject(relation)) return null;
+      const destination = relation.destination;
+      if (!isObject(destination)) return null;
+
+      const slug = (destination.slug as string) || null;
+      const title = (destination.title as string) || "";
+      if (!title) return null;
+
+      return {
+        type: parseNumber(relation.type),
+        title,
+        slug,
+        url: slug ? resolveAbsoluteUrl(`/media/${slug}`, domain) : null,
+        startDate: (destination.startDate as string) || (destination.start_date as string) || null,
+      };
+    })
+    .filter((relation): relation is RelatedAnimeItem => Boolean(relation));
+}
+
 function normalizeEpisodes(episodes: unknown, domain: string, slug: unknown): EpisodeRef[] {
   if (!Array.isArray(episodes)) return [];
 
@@ -521,6 +546,7 @@ function normalizeAnimeInfo(media: JsonObject, domain: string): AnimeInfoData {
     trailer: resolveAbsoluteUrl(media.trailer, domain),
     genres: normalizeGenres(media.genres),
     episodes,
+    relations: normalizeRelations(media.relations, domain),
   };
 }
 

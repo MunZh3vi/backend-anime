@@ -37,5 +37,11 @@ export const verifyEmailQuerySchema = z.object({
   token: z.string().min(1, "El parámetro 'token' es requerido"),
 });
 
+export const twoFactorLoginSchema = z.object({
+  challengeToken: z.string().min(1, "challengeToken es requerido"),
+  code: z.string().trim().min(6, "El código debe tener 6 dígitos").max(6),
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type TwoFactorLoginInput = z.infer<typeof twoFactorLoginSchema>;

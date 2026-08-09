@@ -2,9 +2,16 @@ import { Router } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { authenticate } from "../middlewares/authenticate";
 import { validate } from "../middlewares/validate";
-import { changePasswordSchema, deleteAccountSchema, updateProfileSchema } from "../validators/user.validators";
+import {
+  changeEmailSchema,
+  changePasswordSchema,
+  deleteAccountSchema,
+  updateProfileSchema,
+} from "../validators/user.validators";
+import { disableTwoFactorSchema, enableTwoFactorSchema } from "../validators/twoFactor.validators";
 import { historyBodySchema, listItemBodySchema, paginationQuerySchema } from "../validators/list.validators";
 import * as profileController from "../controllers/profile.controller";
+import * as twoFactorController from "../controllers/twoFactor.controller";
 import * as favoritesController from "../controllers/favorites.controller";
 import * as watchlistController from "../controllers/watchlist.controller";
 import * as historyController from "../controllers/history.controller";
@@ -62,6 +69,133 @@ userRouter.put("/profile", validate(updateProfileSchema), asyncHandler(profileCo
  *       200: { description: Contraseña actualizada }
  */
 userRouter.put("/change-password", validate(changePasswordSchema), asyncHandler(profileController.changePassword));
+
+/**
+ * @openapi
+ * /user/email:
+ *   put:
+ *     summary: Cambiar el email (requiere contraseña, vuelve a pedir verificación)
+ *     tags: [Perfil]
+ *     security: [{ cookieAuth: [] }]
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [newEmail, password]
+ *             properties:
+ *               newEmail: { type: string, format: email }
+ *               password: { type: string }
+ *     responses:
+ *       200: { description: Email actualizado (isEmailVerified vuelve a false) }
+ *       409: { description: Ese email ya está en uso }
+ */
+userRouter.put("/email", validate(changeEmailSchema), asyncHandler(profileController.changeEmail));
+
+/**
+ * @openapi
+ * /user/sessions:
+ *   get:
+ *     summary: Listar sesiones activas (refresh tokens vigentes) de la cuenta
+ *     tags: [Sesiones]
+ *     security: [{ cookieAuth: [] }]
+ *     responses:
+ *       200: { description: Lista de sesiones, con isCurrent marcando la que estás usando ahora }
+ *   delete:
+ *     summary: Cerrar todas las sesiones menos la actual
+ *     tags: [Sesiones]
+ *     security: [{ cookieAuth: [] }]
+ *     responses:
+ *       200: { description: Sesiones cerradas }
+ */
+userRouter.get("/sessions", asyncHandler(profileController.listSessions));
+userRouter.delete("/sessions", asyncHandler(profileController.revokeOtherSessions));
+
+/**
+ * @openapi
+ * /user/sessions/{id}:
+ *   delete:
+ *     summary: Cerrar una sesión específica
+ *     tags: [Sesiones]
+ *     security: [{ cookieAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: Sesión cerrada }
+ *       404: { description: No existe esa sesión }
+ */
+userRouter.delete("/sessions/:id", asyncHandler(profileController.revokeSession));
+
+/**
+ * @openapi
+ * /user/2fa/setup:
+ *   post:
+ *     summary: Generar un secreto TOTP nuevo + QR para activar 2FA (no lo activa todavía)
+ *     tags: [2FA]
+ *     security: [{ cookieAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: Secreto y QR para escanear con la app authenticator
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     secret: { type: string }
+ *                     otpauthUrl: { type: string }
+ *                     qrCodeDataUrl: { type: string, description: "Data URL de imagen PNG, listo para <img src>" }
+ */
+userRouter.post("/2fa/setup", asyncHandler(twoFactorController.setup));
+
+/**
+ * @openapi
+ * /user/2fa/enable:
+ *   post:
+ *     summary: Confirmar y activar 2FA (mandar el secret de /2fa/setup + un código válido)
+ *     tags: [2FA]
+ *     security: [{ cookieAuth: [] }]
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [secret, code]
+ *             properties:
+ *               secret: { type: string }
+ *               code: { type: string }
+ *     responses:
+ *       200: { description: 2FA activado }
+ *       400: { description: Código incorrecto }
+ */
+userRouter.post("/2fa/enable", validate(enableTwoFactorSchema), asyncHandler(twoFactorController.enable));
+
+/**
+ * @openapi
+ * /user/2fa/disable:
+ *   post:
+ *     summary: Desactivar 2FA (requiere contraseña + un código válido)
+ *     tags: [2FA]
+ *     security: [{ cookieAuth: [] }]
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [password, code]
+ *             properties:
+ *               password: { type: string }
+ *               code: { type: string }
+ *     responses:
+ *       200: { description: 2FA desactivado }
+ */
+userRouter.post("/2fa/disable", validate(disableTwoFactorSchema), asyncHandler(twoFactorController.disable));
 
 /**
  * @openapi

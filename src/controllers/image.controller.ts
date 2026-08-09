@@ -3,6 +3,7 @@ import { httpClient } from "../utils/httpClient";
 import { ApiError } from "../utils/ApiError";
 import { env } from "../config/env";
 import { decryptImageUrl } from "../utils/imageProxy";
+import { getCachedImage, setCachedImage } from "../cache/imageCache";
 
 const PRIVATE_HOSTNAME_PATTERNS = [
   /^localhost$/i,
@@ -60,9 +61,19 @@ export async function proxyImage(req: Request, res: Response) {
   }
 
   const target = assertSafeImageUrl(rawUrl);
+  const cacheKey = target.toString();
+
+  const cached = getCachedImage(cacheKey);
+  if (cached) {
+    res.setHeader("Content-Type", cached.contentType);
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.setHeader("X-Cache", "HIT");
+    res.send(cached.buffer);
+    return;
+  }
 
   const upstream = await httpClient
-    .get(target.toString(), { responseType: "stream" })
+    .get(cacheKey, { responseType: "arraybuffer" })
     .catch(() => {
       throw ApiError.upstream("No se pudo obtener la imagen solicitada");
     });
@@ -72,7 +83,11 @@ export async function proxyImage(req: Request, res: Response) {
     throw ApiError.badRequest("La URL solicitada no apunta a una imagen");
   }
 
+  const buffer = Buffer.from(upstream.data);
+  setCachedImage(cacheKey, { contentType, buffer });
+
   res.setHeader("Content-Type", contentType);
   res.setHeader("Cache-Control", "public, max-age=86400");
-  upstream.data.pipe(res);
+  res.setHeader("X-Cache", "MISS");
+  res.send(buffer);
 }

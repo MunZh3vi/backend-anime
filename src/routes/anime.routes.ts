@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
-import { catalog, episode, info, resolve, search, status } from "../controllers/anime.controller";
+import { catalog, episode, genres, info, resolve, search, status, trending } from "../controllers/anime.controller";
 import { proxyImage } from "../controllers/image.controller";
 import { createBatch, createDownload, getBatch, getDownload } from "../controllers/download.controller";
+import { optionalAuthenticate } from "../middlewares/authenticate";
 
 export const animeRouter = Router();
 
@@ -109,7 +110,7 @@ animeRouter.get("/image-proxy", asyncHandler(proxyImage));
  *                       type: array
  *                       items: { $ref: '#/components/schemas/SearchResultItem' }
  */
-animeRouter.get("/search", asyncHandler(search));
+animeRouter.get("/search", optionalAuthenticate, asyncHandler(search));
 
 /**
  * @openapi
@@ -135,7 +136,7 @@ animeRouter.get("/search", asyncHandler(search));
  *                 source: { type: string }
  *                 data: { $ref: '#/components/schemas/AnimeInfoData' }
  */
-animeRouter.get("/info", asyncHandler(info));
+animeRouter.get("/info", optionalAuthenticate, asyncHandler(info));
 
 /**
  * @openapi
@@ -168,7 +169,7 @@ animeRouter.get("/info", asyncHandler(info));
  *                 source: { type: string }
  *                 data: { $ref: '#/components/schemas/EpisodeLinksData' }
  */
-animeRouter.get("/episode", asyncHandler(episode));
+animeRouter.get("/episode", optionalAuthenticate, asyncHandler(episode));
 
 /**
  * @openapi
@@ -199,7 +200,53 @@ animeRouter.get("/episode", asyncHandler(episode));
  *                 source: { type: string }
  *                 data: { $ref: '#/components/schemas/CatalogData' }
  */
-animeRouter.get("/catalog", asyncHandler(catalog));
+animeRouter.get("/catalog", optionalAuthenticate, asyncHandler(catalog));
+
+/**
+ * @openapi
+ * /v1/anime/trending:
+ *   get:
+ *     summary: Ranking propio de "más visto" armado con el historial real de reproducción de los usuarios
+ *     tags: [Catálogo]
+ *     description: A diferencia de /catalog (que refleja el orden que trae el proveedor), esto cuenta reproducciones reales en la ventana de tiempo indicada.
+ *     parameters:
+ *       - in: query
+ *         name: days
+ *         schema: { type: integer, default: 7, minimum: 1, maximum: 30 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 10, minimum: 1, maximum: 50 }
+ *     responses:
+ *       200:
+ *         description: Lista ordenada por cantidad de usuarios distintos que lo vieron
+ */
+animeRouter.get("/trending", optionalAuthenticate, asyncHandler(trending));
+
+/**
+ * @openapi
+ * /v1/anime/genres:
+ *   get:
+ *     summary: Lista curada de géneros para poblar un filtro (no viene de scraping en vivo)
+ *     tags: [Catálogo]
+ *     description: Los slugs coinciden con los que espera /catalog?provider=animeflv&genre=<slug>. Es una lista estática mantenida a mano, no un scrape en vivo (ninguna fuente expone esto en HTML sin JS).
+ *     responses:
+ *       200:
+ *         description: Lista de géneros
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       slug: { type: string, example: accion }
+ *                       name: { type: string, example: Acción }
+ */
+animeRouter.get("/genres", asyncHandler(genres));
 
 /**
  * @openapi

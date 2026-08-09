@@ -2,8 +2,14 @@ import { Router } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { validate } from "../middlewares/validate";
 import { authRateLimiter } from "../middlewares/authRateLimiter";
-import { loginSchema, refreshTokenBodySchema, registerSchema, verifyEmailQuerySchema } from "../validators/auth.validators";
-import { login, logout, refreshTokenHandler, register, verifyEmail } from "../controllers/auth.controller";
+import {
+  loginSchema,
+  refreshTokenBodySchema,
+  registerSchema,
+  twoFactorLoginSchema,
+  verifyEmailQuerySchema,
+} from "../validators/auth.validators";
+import { login, loginTwoFactor, logout, refreshTokenHandler, register, verifyEmail } from "../controllers/auth.controller";
 
 export const authRouter = Router();
 
@@ -54,7 +60,7 @@ authRouter.post("/register", authRateLimiter, validate(registerSchema), asyncHan
  *               password: { type: string, format: password }
  *     responses:
  *       200:
- *         description: Sesión iniciada. Setea cookies HttpOnly accessToken/refreshToken.
+ *         description: Sesión iniciada (setea cookies), o si el usuario tiene 2FA activo, { twoFactorRequired: true, challengeToken } en vez de las cookies — completar con POST /auth/login/2fa.
  *       401:
  *         description: Credenciales inválidas
  *         content:
@@ -62,6 +68,27 @@ authRouter.post("/register", authRateLimiter, validate(registerSchema), asyncHan
  *             schema: { $ref: '#/components/schemas/ErrorResponse' }
  */
 authRouter.post("/login", authRateLimiter, validate(loginSchema), asyncHandler(login));
+
+/**
+ * @openapi
+ * /auth/login/2fa:
+ *   post:
+ *     summary: Completar el login cuando /auth/login devolvió twoFactorRequired
+ *     tags: [Autenticación]
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [challengeToken, code]
+ *             properties:
+ *               challengeToken: { type: string }
+ *               code: { type: string, description: "Código de 6 dígitos de la app authenticator" }
+ *     responses:
+ *       200: { description: Sesión iniciada. Setea cookies HttpOnly. }
+ *       401: { description: Código incorrecto o challengeToken inválido/expirado }
+ */
+authRouter.post("/login/2fa", authRateLimiter, validate(twoFactorLoginSchema), asyncHandler(loginTwoFactor));
 
 /**
  * @openapi

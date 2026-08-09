@@ -13,6 +13,12 @@ export const updateProfileSchema = z.object({
   // FRIENDS se acepta y se guarda, pero hoy se trata igual que PRIVATE al
   // resolver qué puede ver un visitante (no existe un sistema de amistades).
   profileVisibility: z.enum(["PUBLIC", "FRIENDS", "PRIVATE"]).optional(),
+  matureContentEnabled: z.boolean().optional(),
+});
+
+export const changeEmailSchema = z.object({
+  newEmail: z.string().trim().toLowerCase().email("Email inválido"),
+  password: z.string().min(1, "La contraseña es requerida para cambiar el email"),
 });
 
 export const changePasswordSchema = z
@@ -32,3 +38,4 @@ export const deleteAccountSchema = z.object({
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 export type DeleteAccountInput = z.infer<typeof deleteAccountSchema>;
+export type ChangeEmailInput = z.infer<typeof changeEmailSchema>;

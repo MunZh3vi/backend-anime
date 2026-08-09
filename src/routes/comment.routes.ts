@@ -2,7 +2,13 @@ import { Router } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { authenticate, optionalAuthenticate } from "../middlewares/authenticate";
 import { validate } from "../middlewares/validate";
-import { createCommentSchema, listCommentsQuerySchema, updateCommentSchema } from "../validators/comment.validators";
+import { commentRateLimiter } from "../middlewares/commentRateLimiter";
+import {
+  createCommentSchema,
+  listCommentsQuerySchema,
+  reportCommentSchema,
+  updateCommentSchema,
+} from "../validators/comment.validators";
 import * as commentController from "../controllers/comment.controller";
 
 export const commentRouter = Router();
@@ -49,7 +55,13 @@ export const commentRouter = Router();
  *       201: { description: Comentario creado }
  */
 commentRouter.get("/", optionalAuthenticate, validate(listCommentsQuerySchema, "query"), asyncHandler(commentController.list));
-commentRouter.post("/", authenticate, validate(createCommentSchema), asyncHandler(commentController.create));
+commentRouter.post(
+  "/",
+  authenticate,
+  commentRateLimiter,
+  validate(createCommentSchema),
+  asyncHandler(commentController.create)
+);
 
 /**
  * @openapi
@@ -116,3 +128,28 @@ commentRouter.delete("/:id", authenticate, asyncHandler(commentController.remove
  */
 commentRouter.post("/:id/like", authenticate, asyncHandler(commentController.like));
 commentRouter.delete("/:id/like", authenticate, asyncHandler(commentController.unlike));
+
+/**
+ * @openapi
+ * /comments/{id}/report:
+ *   post:
+ *     summary: Reportar un comentario para revisión de moderación
+ *     tags: [Comentarios]
+ *     security: [{ cookieAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [reason]
+ *             properties:
+ *               reason: { type: string }
+ *     responses:
+ *       200: { description: Comentario reportado (si ya lo habías reportado, actualiza el motivo) }
+ */
+commentRouter.post("/:id/report", authenticate, validate(reportCommentSchema), asyncHandler(commentController.report));

@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import * as commentService from "../services/comment.service";
 import { sendSuccess } from "../utils/response";
 import { ApiError } from "../utils/ApiError";
-import { CreateCommentInput, ListCommentsQuery, UpdateCommentInput } from "../validators/comment.validators";
+import { CreateCommentInput, ListCommentsQuery, ReportCommentInput, UpdateCommentInput } from "../validators/comment.validators";
 
 export async function list(req: Request, res: Response) {
   const { animeId, episodeId, page, limit } = req.query as unknown as ListCommentsQuery;
@@ -27,7 +27,8 @@ export async function update(req: Request, res: Response) {
 export async function remove(req: Request, res: Response) {
   const { id } = req.params;
   if (!id) throw ApiError.badRequest("id es requerido");
-  await commentService.deleteComment(req.userId!, id);
+  const isModerator = req.userRole === "MODERATOR" || req.userRole === "ADMIN";
+  await commentService.deleteComment(req.userId!, id, isModerator);
   sendSuccess(res, { message: "Comentario eliminado" });
 }
 
@@ -43,4 +44,12 @@ export async function unlike(req: Request, res: Response) {
   if (!id) throw ApiError.badRequest("id es requerido");
   await commentService.unlikeComment(req.userId!, id);
   sendSuccess(res, { message: "Like removido" });
+}
+
+export async function report(req: Request, res: Response) {
+  const { id } = req.params;
+  if (!id) throw ApiError.badRequest("id es requerido");
+  const input = req.body as ReportCommentInput;
+  await commentService.reportComment(req.userId!, id, input.reason);
+  sendSuccess(res, { message: "Comentario reportado" });
 }

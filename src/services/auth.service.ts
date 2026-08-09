@@ -1,12 +1,13 @@
 import { randomBytes } from "node:crypto";
+import { verify as verifyTotp } from "otplib";
 import { prisma } from "../config/prisma";
 import { env } from "../config/env";
 import { ApiError } from "../utils/ApiError";
 import { logger } from "../utils/logger";
 import { hashPassword, verifyPassword } from "../utils/password";
-import { signAccessToken } from "../utils/jwt";
+import { signAccessToken, signTwoFactorChallengeToken, verifyTwoFactorChallengeToken } from "../utils/jwt";
 import { generateRefreshToken, hashRefreshToken } from "../utils/refreshToken";
-import type { User } from "@prisma/client";
+import type { Role, User } from "@prisma/client";
 import type { LoginInput, RegisterInput } from "../validators/auth.validators";
 
 export interface PublicUser {
@@ -16,9 +17,17 @@ export interface PublicUser {
   avatarUrl: string | null;
   bio: string | null;
   subscriptionStatus: string;
+  role: Role;
   isEmailVerified: boolean;
   profileVisibility: "PUBLIC" | "FRIENDS" | "PRIVATE";
+  matureContentEnabled: boolean;
+  twoFactorEnabled: boolean;
   createdAt: Date;
+}
+
+export interface DeviceMeta {
+  userAgent?: string | null;
+  ipAddress?: string | null;
 }
 
 export interface AuthResult {
@@ -26,6 +35,8 @@ export interface AuthResult {
   accessToken: string;
   refreshToken: string;
 }
+
+export type LoginResult = AuthResult | { twoFactorRequired: true; challengeToken: string };
 
 function toPublicUser(user: User): PublicUser {
   return {
@@ -35,13 +46,25 @@ function toPublicUser(user: User): PublicUser {
     avatarUrl: user.avatarUrl,
     bio: user.bio,
     subscriptionStatus: user.subscriptionStatus,
+    role: user.role,
     isEmailVerified: user.isEmailVerified,
     profileVisibility: user.profileVisibility,
+    matureContentEnabled: user.matureContentEnabled,
+    twoFactorEnabled: user.twoFactorEnabled,
     createdAt: user.createdAt,
   };
 }
 
-async function issueTokenPair(userId: string): Promise<{ accessToken: string; refreshToken: string }> {
+function assertNotBanned(user: User): void {
+  if (user.bannedAt) {
+    throw ApiError.forbidden(`Tu cuenta fue suspendida${user.banReason ? `: ${user.banReason}` : ""}`);
+  }
+}
+
+async function issueTokenPair(
+  userId: string,
+  device: DeviceMeta = {}
+): Promise<{ accessToken: string; refreshToken: string }> {
   const accessToken = signAccessToken(userId);
   const refreshToken = generateRefreshToken();
 
@@ -52,13 +75,15 @@ async function issueTokenPair(userId: string): Promise<{ accessToken: string; re
       userId,
       tokenHash: hashRefreshToken(refreshToken),
       expiresAt,
+      userAgent: device.userAgent ?? null,
+      ipAddress: device.ipAddress ?? null,
     },
   });
 
   return { accessToken, refreshToken };
 }
 
-export async function register(input: RegisterInput): Promise<AuthResult> {
+export async function register(input: RegisterInput, device: DeviceMeta = {}): Promise<AuthResult> {
   const existing = await prisma.user.findFirst({
     where: { OR: [{ email: input.email }, { username: input.username }] },
   });
@@ -86,11 +111,11 @@ export async function register(input: RegisterInput): Promise<AuthResult> {
   // para poder verificar manualmente en desarrollo. Ver GET /api/auth/verify-email.
   logger.info(`Verificación de email para ${user.email}: token=${emailVerificationToken}`);
 
-  const tokens = await issueTokenPair(user.id);
+  const tokens = await issueTokenPair(user.id, device);
   return { user: toPublicUser(user), ...tokens };
 }
 
-export async function login(input: LoginInput): Promise<AuthResult> {
+export async function login(input: LoginInput, device: DeviceMeta = {}): Promise<LoginResult> {
   const user = await prisma.user.findUnique({ where: { email: input.email } });
   if (!user) {
     throw ApiError.unauthorized("Email o contraseña incorrectos");
@@ -101,11 +126,41 @@ export async function login(input: LoginInput): Promise<AuthResult> {
     throw ApiError.unauthorized("Email o contraseña incorrectos");
   }
 
-  const tokens = await issueTokenPair(user.id);
+  assertNotBanned(user);
+
+  if (user.twoFactorEnabled) {
+    return { twoFactorRequired: true, challengeToken: signTwoFactorChallengeToken(user.id) };
+  }
+
+  const tokens = await issueTokenPair(user.id, device);
   return { user: toPublicUser(user), ...tokens };
 }
 
-export async function refresh(rawRefreshToken: string): Promise<{ accessToken: string; refreshToken: string }> {
+export async function completeTwoFactorLogin(
+  challengeToken: string,
+  code: string,
+  device: DeviceMeta = {}
+): Promise<AuthResult> {
+  const { sub: userId } = verifyTwoFactorChallengeToken(challengeToken);
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user || !user.twoFactorEnabled || !user.twoFactorSecret) {
+    throw ApiError.unauthorized("No se pudo completar el inicio de sesión");
+  }
+
+  assertNotBanned(user);
+
+  const { valid } = await verifyTotp({ secret: user.twoFactorSecret, token: code });
+  if (!valid) throw ApiError.unauthorized("Código de verificación incorrecto");
+
+  const tokens = await issueTokenPair(user.id, device);
+  return { user: toPublicUser(user), ...tokens };
+}
+
+export async function refresh(
+  rawRefreshToken: string,
+  device: DeviceMeta = {}
+): Promise<{ accessToken: string; refreshToken: string }> {
   const tokenHash = hashRefreshToken(rawRefreshToken);
   const stored = await prisma.refreshToken.findUnique({ where: { tokenHash } });
 
@@ -120,7 +175,7 @@ export async function refresh(rawRefreshToken: string): Promise<{ accessToken: s
     data: { revokedAt: new Date() },
   });
 
-  return issueTokenPair(stored.userId);
+  return issueTokenPair(stored.userId, device);
 }
 
 export async function logout(rawRefreshToken: string | undefined): Promise<void> {

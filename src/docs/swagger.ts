@@ -80,6 +80,20 @@ const options: swaggerJsdoc.Options = {
                 },
               },
             },
+            relations: {
+              type: "array",
+              description: "Secuelas, precuelas, películas, etc. Solo disponible desde AnimeAV1 por ahora.",
+              items: {
+                type: "object",
+                properties: {
+                  type: { type: "integer", nullable: true, description: "Código numérico de relación tal cual lo expone la fuente" },
+                  title: { type: "string" },
+                  slug: { type: "string", nullable: true },
+                  url: { type: "string", nullable: true },
+                  startDate: { type: "string", nullable: true },
+                },
+              },
+            },
           },
         },
         VideoLink: {
