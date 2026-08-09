@@ -15,6 +15,13 @@ const PRIVATE_HOSTNAME_PATTERNS = [
   /^::1$/,
 ];
 
+// AniList es una integración de primera parte (anilist.service.ts la usa
+// para mejorar cover/backdrop vía malId): siempre permitida sin depender de
+// que el operador la haya agregado a IMAGE_PROXY_ALLOWED_HOSTS. Sirve las
+// imágenes desde subdominios rotativos (s1.anilist.co, s4.anilist.co, etc.),
+// de ahí el match por sufijo en vez de listar cada uno.
+const ALWAYS_ALLOWED_HOSTS = ["anilist.co"];
+
 function assertSafeImageUrl(rawUrl: string): URL {
   let parsed: URL;
   try {
@@ -32,11 +39,11 @@ function assertSafeImageUrl(rawUrl: string): URL {
   }
 
   // Anti-SSRF: solo se permite proxear imágenes de dominios conocidos de las
-  // fuentes de scraping (configurable vía IMAGE_PROXY_ALLOWED_HOSTS). Se
-  // mantiene como defensa en profundidad aunque el token ya venga cifrado.
-  const isAllowed = env.imageProxyAllowedHosts.some(
-    (host) => parsed.hostname === host || parsed.hostname.endsWith(`.${host}`)
-  );
+  // fuentes de scraping (configurable vía IMAGE_PROXY_ALLOWED_HOSTS) o de
+  // integraciones propias como AniList. Se mantiene como defensa en
+  // profundidad aunque el token ya venga cifrado.
+  const allowedHosts = [...ALWAYS_ALLOWED_HOSTS, ...env.imageProxyAllowedHosts];
+  const isAllowed = allowedHosts.some((host) => parsed.hostname === host || parsed.hostname.endsWith(`.${host}`));
   if (env.imageProxyAllowedHosts.length > 0 && !isAllowed) {
     throw ApiError.badRequest(`Host no permitido: ${parsed.hostname}`);
   }
